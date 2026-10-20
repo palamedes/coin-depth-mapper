@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Relief Depth Studio</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23222' stroke='%23ffa31a' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23ffa31a'/%3E%3C/svg%3E" />
+    <script type="module" crossorigin src="./assets/index-XGNKATPe.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CIcslmQ4.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="logo"></span>Relief Depth Studio</div>
+      <button id="btn-open" class="btn" data-tip="Open a PNG, JPG or WebP. You can also drag a file onto the window or paste an image with Ctrl+V.">Open image…</button>
+      <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+      <div class="status" id="status" aria-live="polite">
+        <span id="status-text">Open an image to start.</span>
+        <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
+      </div>
+      <div class="presets">
+        <button id="btn-preset-save" class="btn ghost" data-tip="Save all current settings (except the crop position) to a .json file you can load later.">Save preset</button>
+        <button id="btn-preset-load" class="btn ghost" data-tip="Load settings from a preset .json file.">Load preset</button>
+        <input id="preset-input" type="file" accept="application/json,.json" hidden />
+        <button id="btn-reset" class="btn ghost" data-tip="Put every setting back to its default (keeps the image and crop).">Reset</button>
+      </div>
+      <div class="device" id="device" data-tip="Where the depth models run. A GPU is much faster than the CPU.">…</div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel" id="panel"></aside>
+
+      <section class="stage">
+        <nav class="tabs" role="tablist">
+          <button role="tab" class="tab active" data-view="compare" data-tip="Photo and depth map side by side. Zoom with the mouse wheel, drag to pan; both sides move together.">Compare</button>
+          <button role="tab" class="tab" data-view="3d" data-tip="The depth map as a lit metal surface you can rotate.">3D</button>
+          <button role="tab" class="tab" data-view="slices" data-tip="See which pixels LightBurn's 3D Sliced mode fires on each pass.">Slices</button>
+          <div class="tools" id="tools-compare">
+            <button class="btn ghost small" id="btn-edit-crop" data-tip="Show the whole photo and move or resize the coin circle / crop box.">Edit crop</button>
+            <button class="btn ghost small" id="btn-profile" data-tip="Draw a line across the image to graph the height along it.">Cross-section</button>
+            <button class="btn ghost small" id="btn-fit" data-tip="Fit the image to the window (or double-click the image).">Fit</button>
+            <button class="btn ghost small" id="btn-100" data-tip="Show one image pixel per screen pixel.">1:1</button>
+          </div>
+        </nav>
+
+        <div class="view" id="view-compare">
+          <div class="pane" id="pane-left"><div class="pane-label" id="label-left">Photo</div></div>
+          <div class="pane" id="pane-right"><div class="pane-label">Depth map <span class="muted">(white = highest)</span></div></div>
+        </div>
+        <div class="view" id="view-3d" hidden></div>
+        <div class="view" id="view-slices" hidden></div>
+        <div class="profile" id="profile" hidden></div>
+        <div class="empty" id="empty">
+          <div class="empty-card">
+            <h2>Drop an image here</h2>
+            <p>or click <b>Open image…</b>, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. PNG, JPG or WebP.</p>
+            <p class="muted">A coin or medallion render works best. The circle is found automatically.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="drop-overlay" id="drop-overlay" hidden><div>Drop the image to open it</div></div>
+    <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  </body>
+</html>

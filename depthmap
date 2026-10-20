@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# depthmap — Relief Depth Studio: turn an image into a grayscale depth map for 3D Sliced
+# laser engraving (LightBurn, EzCad3).
+#
+#   ./depthmap                     # serve http://127.0.0.1:8790 and open it in the browser
+#   ./depthmap --port 9000 --no-browser
+#   ./depthmap --help              # all options
+#
+# Works from any directory, also through a symlink on $PATH. The first run installs the Python
+# dependencies into .venv with uv (PyTorch with CUDA is a few GB) and, if Node.js is installed,
+# rebuilds the web page whenever its sources changed. Ctrl+C stops the app.
+set -euo pipefail
+
+# Resolve our real location, even when invoked via a symlink on $PATH.
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+HERE="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+
+command -v uv >/dev/null 2>&1 || {
+  echo "Relief Depth Studio needs uv: https://docs.astral.sh/uv/getting-started/installation/" >&2
+  exit 1
+}
+
+# A virtualenv has its own path baked into its scripts, so moving the project folder breaks
+# it. Rebuild it when that happens (uv reinstalls from its cache in a few seconds).
+launcher="$HERE/.venv/bin/depthmap"
+if [[ -f "$launcher" ]]; then
+  interpreter="$(head -n1 "$launcher")"
+  interpreter="${interpreter#'#!'}"
+  if [[ ! -x "$interpreter" ]]; then
+    echo "The project folder moved; rebuilding .venv…" >&2
+    rm -rf "$HERE/.venv"
+  fi
+fi
+
+# The built web page ships in src/relief_depth_studio/web. Rebuild it when the sources are newer.
+web="$HERE/src/relief_depth_studio/web/index.html"
+front="$HERE/frontend"
+needs_build=""
+if [[ -f "$front/package.json" ]]; then
+  if [[ ! -f "$web" ]] || [[ -n "$(find "$front/src" "$front/index.html" "$front/package.json" -newer "$web" -print -quit 2>/dev/null)" ]]; then
+    needs_build=1
+  fi
+fi
+if [[ -n "$needs_build" ]]; then
+  if command -v npm >/dev/null 2>&1; then
+    echo "Building the web page…" >&2
+    (
+      cd "$front"
+      [[ -d node_modules ]] || npm ci --no-audit --no-fund --loglevel=error
+      npm run --silent build
+    ) >&2
+  elif [[ ! -f "$web" ]]; then
+    echo "The web page has not been built and Node.js (npm) is not installed: https://nodejs.org" >&2
+    exit 1
+  fi
+fi
+
+exec uv run --project "$HERE" depthmap "$@"

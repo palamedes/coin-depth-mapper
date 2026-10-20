@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  frontend:
+    name: Processing math & UI build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npx vite build
+
+  backend:
+    name: Backend (CPU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      # The project pins CUDA builds of PyTorch (several GB). CI has no GPU, so install the
+      # CPU build and everything else from the lockfile. Real-model tests (-m gpu) are skipped.
+      - name: Install (CPU PyTorch)
+        run: |
+          uv export --frozen --no-hashes --no-emit-project | grep -vE '^(torch|torchvision|triton|nvidia-|cuda-)' > /tmp/requirements.txt
+          uv venv --python 3.12
+          uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          uv pip install -r /tmp/requirements.txt
+          uv pip install -e . --no-deps
+      - run: .venv/bin/python -m pytest -q

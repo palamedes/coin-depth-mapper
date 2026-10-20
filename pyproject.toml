@@ -1,0 +1,64 @@
+[project]
+name = "relief-depth-studio"
+version = "0.1.0"
+description = "Turn an image into a smooth grayscale depth map for 3D Sliced laser engraving (LightBurn, EzCad3)"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "fastapi>=0.155.0",
+    "uvicorn[standard]>=0.40.0",
+    "python-multipart>=0.0.20",
+    "numpy>=2.1",
+    "opencv-python-headless>=4.10",
+    "pillow>=11.0",
+    "torch>=2.8",
+    "torchvision>=0.23",
+    "huggingface-hub>=0.34",
+    "safetensors>=0.5",
+    # Marigold
+    "diffusers>=0.35",
+    "transformers>=4.56",
+    "accelerate>=1.0",
+    "scipy>=1.14",  # Marigold ensembling
+    # MonoRelief V2 (LoRA adapter)
+    "peft>=0.17",
+    # Depth Anything 3 network code (vendored, see src/relief_depth_studio/vendor)
+    "addict>=2.4",
+    "omegaconf>=2.3",
+    "einops>=0.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/palamedes/coin-depth-mapper"
+Issues = "https://github.com/palamedes/coin-depth-mapper/issues"
+
+[project.scripts]
+depthmap = "relief_depth_studio:main"
+
+[build-system]
+requires = ["uv_build>=0.11.25,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "httpx>=0.28",
+]
+
+# CUDA 13.0 builds of PyTorch cover every NVIDIA GPU from Turing to Blackwell (RTX 50xx)
+# and need driver 580+. macOS gets the default PyPI wheels, which include Apple MPS.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu130", marker = "sys_platform != 'darwin'" }]
+torchvision = [{ index = "pytorch-cu130", marker = "sys_platform != 'darwin'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: runs a real depth model (downloads weights on first run)"]
+addopts = "-m 'not gpu'"
