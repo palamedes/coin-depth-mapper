@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.0
       # The project pins CUDA builds of PyTorch (several GB). CI has no GPU, so install the
       # CPU build and everything else from the lockfile. Real-model tests (-m gpu) are skipped.
       - name: Install (CPU PyTorch)
