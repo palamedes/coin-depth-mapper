@@ -110,9 +110,20 @@ select {
     transform: translateX(340%);
   }
 }
-.presets {
+.presets,
+.project-buttons {
   display: flex;
   gap: 6px;
+}
+.btn.dirty::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
 }
 .device {
   padding: 4px 10px;
@@ -299,6 +310,119 @@ select {
   width: 96px;
   text-align: right;
 }
+.ctl .text-input {
+  grid-column: 1 / -1;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  min-height: 32px;
+  font-size: 15px;
+}
+.row.checks {
+  gap: 18px;
+}
+
+/* ---- sub-sections inside a section: per-layer levels, text layers ---- */
+.sub {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.sub > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text-2);
+  user-select: none;
+}
+.sub > summary::-webkit-details-marker {
+  display: none;
+}
+.sub > summary::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex: none;
+}
+.sub[open] > summary::before {
+  transform: rotate(45deg);
+}
+.sub > summary .chip {
+  font-size: 11px;
+  padding: 0 6px;
+}
+.sub-body {
+  padding: 2px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.text-card {
+  background: var(--surface-2);
+}
+
+/* ---- layer tabs in Levels & curve: Master, Coin, Subject ---- */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+.seg-btn {
+  flex: 1;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-2);
+  padding: 6px 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.seg-btn.on {
+  background: var(--surface-3);
+  color: var(--text);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* This layer's levels or curve change something. */
+.seg-btn.changed::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+}
+.text-card > summary {
+  color: var(--text);
+  font-weight: 600;
+}
+.text-card .text-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.text-card.disabled .sub-body {
+  opacity: 0.45;
+}
 .help {
   display: inline-grid;
   place-items: center;
@@ -346,6 +470,52 @@ select {
 }
 .chip.bad {
   color: var(--bad);
+}
+.coin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.coin-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.coin-tile:hover {
+  border-color: var(--muted);
+}
+.coin-tile.on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--text);
+}
+.coin-tile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.coin-tile img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.coin-tile span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
 }
 .kv {
   display: grid;
@@ -464,8 +634,13 @@ canvas.widget {
 .empty {
   position: absolute;
   inset: 48px 0 0 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 16px;
+  overflow: auto;
   background: var(--bg);
   z-index: 5;
 }
@@ -523,6 +698,16 @@ kbd {
 /* ---- 3D and slices ---- */
 #view-3d canvas {
   display: block;
+}
+.view-message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.view-message p {
+  line-height: 1.5;
 }
 .overlay-controls {
   position: absolute;
@@ -606,4 +791,169 @@ kbd {
   .presets .btn {
     display: none;
   }
+}
+
+/* ---- projects ---- */
+.dialog {
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+}
+.dialog::backdrop {
+  background: rgba(8, 9, 11, 0.7);
+}
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.dialog h3,
+.recent h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dialog section {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dialog-foot {
+  margin-top: 18px;
+}
+.dialog > .note {
+  margin-top: 10px;
+}
+.project-save input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  font-size: 15px;
+}
+.project-save .btn {
+  flex: none;
+  min-width: 92px;
+}
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+.icon-btn:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.icon-btn.danger:hover {
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.project-tile {
+  position: relative;
+  min-width: 0;
+}
+.project-open {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 6px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  text-align: left;
+  cursor: pointer;
+}
+.project-open:hover {
+  border-color: var(--muted);
+}
+.project-tile.on .project-open {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.project-open img,
+.project-thumb-none {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 5px;
+  background: #000;
+  margin-bottom: 4px;
+}
+.project-thumb-none {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.project-date {
+  font-size: 12px;
+  color: var(--muted);
+}
+.project-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.project-actions .icon-btn {
+  background: rgba(18, 20, 23, 0.9);
+  color: var(--text);
+}
+.project-tile:hover .project-actions,
+.project-tile:focus-within .project-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .project-actions {
+    opacity: 1;
+  }
+}
+.recent {
+  width: min(760px, 100%);
+}
+.recent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
 }

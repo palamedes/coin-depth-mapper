@@ -9,7 +9,8 @@
     "test": "vitest run",
     "e2e": "node tests/e2e.mjs",
     "e2e:lite": "node tests/e2e-lite.mjs",
-    "screenshots": "node tests/screenshots.mjs"
+    "screenshots": "node tests/screenshots.mjs",
+    "bake-env": "node tests/bake-env.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",

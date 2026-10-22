@@ -4,6 +4,8 @@ import { runPipeline, PipelineCache } from "../src/proc/pipeline";
 import { defaultSettings } from "../src/proc/settings";
 import { bilateral, despeckle, guidedUpsample, jointBilateralUpsample, gaussianBlur } from "../src/proc/filters";
 import { encodePNG, toGray } from "../src/proc/export";
+import * as THREE from "three";
+import { prepareRelief, renderFrame } from "../src/ui/softRender";
 
 it.skipIf(!process.env.BENCH)("bench", async () => {
   for (const N of [1024, 2000]) {
@@ -23,5 +25,31 @@ it.skipIf(!process.env.BENCH)("bench", async () => {
     t("levels change (cached)", () => runPipeline(inp, s, N / 40, cache));
     const out = runPipeline(inp, s, N / 40, cache).out;
     const t0 = performance.now(); await encodePNG(toGray(out, 16), N, N, 16, 1000); console.log(N, "png16", (performance.now() - t0).toFixed(0), "ms");
+  }
+});
+
+it.skipIf(!process.env.BENCH)("bench software 3D", () => {
+  const N = 1024;
+  const data = Float32Array.from({ length: N * N }, (_, i) => {
+    const x = (i % N) / N - 0.5, y = Math.floor(i / N) / N - 0.5;
+    return Math.max(0, 1 - (x * x + y * y) * 4) * (0.8 + 0.2 * Math.sin(x * 90) * Math.cos(y * 70));
+  });
+  let t0 = performance.now();
+  const r = prepareRelief(data, N, N, 40, 40, 6);
+  console.log("prepare relief", (performance.now() - t0).toFixed(0), "ms");
+  const [W, H] = [1060, 760];
+  const cam = new THREE.PerspectiveCamera(35, W / H, 0.1, 5000);
+  cam.up.set(0, 0, 1);
+  cam.position.set(0, -44, 60);
+  cam.lookAt(0, 0, 0);
+  cam.updateMatrixWorld();
+  const M = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse).elements;
+  for (const [grid, scale] of [[160, 0.5], [384, 1], [768, 1]]) {
+    const spec = { width: Math.round(W * scale), height: Math.round(H * scale), viewProj: M, camera: [0, -44, 60] as [number, number, number],
+      light: [-0.58, 0.58, 0.57] as [number, number, number], color: [0.7, 0.72, 0.76] as [number, number, number], roughness: 0.22, grid };
+    renderFrame(r, spec); // builds and caches the mesh
+    t0 = performance.now();
+    for (let i = 0; i < 3; i++) renderFrame(r, spec);
+    console.log(`frame grid ${grid} at ${spec.width}x${spec.height}`, ((performance.now() - t0) / 3).toFixed(0), "ms");
   }
 });

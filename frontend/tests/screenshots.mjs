@@ -15,7 +15,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
 const out = join(root, "docs/screenshots");
 mkdirSync(out, { recursive: true });
-const sample = join(root, "samples/coin-westie.webp");
+const sample = join(root, "samples/coin-toby.webp");
 const chromePath =
   process.env.CHROME ??
   ["/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser",
@@ -66,6 +66,11 @@ try {
     console.log("wrote", path);
   };
 
+  // Unfold the sections shown below (a fresh start opens only the first).
+  await page.evaluate(() => {
+    for (const d of document.querySelectorAll("#panel details.section"))
+      if (["Depth model", "Levels & curve"].includes(d.querySelector(".title")?.textContent)) d.open = true;
+  });
   await page.setInputFiles("#file-input", sample);
   await until(() => page.evaluate(() => !!window.__rds.state.latest), "depth");
   await page.getByRole("button", { name: "Auto levels" }).click();
@@ -131,7 +136,7 @@ try {
   await page.locator(".slices-side input[type=range]").fill("96");
   await shot("slices.png");
 
-  const blender = join(root, "samples/demo/coin-westie_blender-preview.png");
+  const blender = join(root, "samples/demo/coin-toby_blender-preview.png");
   if (existsSync(blender)) copyFileSync(blender, join(out, "blender.png"));
   console.log("done");
 } catch (err) {

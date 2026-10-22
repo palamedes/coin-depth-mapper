@@ -3,6 +3,48 @@
 
 import { type Img, makeImg, resize } from "./image";
 
+/**
+ * Minimum (or maximum) over a (2r+1)x(2r+1) window, O(1) per pixel (van Herk / Gil-Werman).
+ * Outside the image counts as no value; +-Infinity in the data also counts as no value.
+ */
+export function extremeFilter(src: Img, r: number, max: boolean): Img {
+  r = Math.floor(r);
+  const { w, h } = src;
+  if (r < 1) return makeImg(w, h, src.data.slice());
+  const none = max ? -Infinity : Infinity;
+  const pick = max ? Math.max : Math.min;
+  const s = 2 * r + 1;
+  const run = (line: Float32Array, n: number, out: Float32Array) => {
+    // Pad with `none`, then per block of s: g = running extreme from the block start, hh = to the block end.
+    const len = Math.ceil((n + 2 * r) / s) * s;
+    const g = new Float32Array(len);
+    const hh = new Float32Array(len);
+    for (let i = 0; i < len; i++) {
+      const v = i >= r && i < n + r ? line[i - r] : none;
+      g[i] = i % s === 0 ? v : pick(g[i - 1], v);
+    }
+    for (let i = len - 1; i >= 0; i--) {
+      const v = i >= r && i < n + r ? line[i - r] : none;
+      hh[i] = i % s === s - 1 || i === len - 1 ? v : pick(hh[i + 1], v);
+    }
+    for (let i = 0; i < n; i++) out[i] = pick(hh[i], g[i + s - 1]);
+  };
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  const line = new Float32Array(Math.max(w, h));
+  const res = new Float32Array(Math.max(w, h));
+  for (let y = 0; y < h; y++) {
+    run(src.data.subarray(y * w, y * w + w), w, res);
+    tmp.set(res.subarray(0, w), y * w);
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) line[y] = tmp[y * w + x];
+    run(line, h, res);
+    for (let y = 0; y < h; y++) out[y * w + x] = res[y];
+  }
+  return makeImg(w, h, out);
+}
+
 /** Mean over a (2r+1)x(2r+1) window. O(1) per pixel. */
 export function boxBlur(src: Img, r: number): Img {
   r = Math.floor(r);

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import pytest
@@ -81,7 +84,7 @@ def test_detects_offcentre_coin_in_wide_image():
 
 
 def test_detects_sample_coin_outer_rim():
-    rgb = np.asarray(Image.open(SAMPLES / "coin-westie.webp").convert("RGB"))
+    rgb = np.asarray(Image.open(SAMPLES / "coin-toby.webp").convert("RGB"))
     circles = detect_circles(rgb)
     c = circles[0]
     # Measured by hand: the coin's outer edge is centred near (623, 611) with radius ~593.
@@ -240,3 +243,115 @@ def test_params_must_be_json_ints(client):
     r = client.post("/api/depth", files={"image": ("x.png", _png(img))},
                     data={"model_id": "fake", "resolution": "32", "params": json.dumps(["x"])})
     assert r.status_code == 400
+
+
+# ---- coin library --------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def coin_client(tmp_path):
+    (tmp_path / "zebra.png").write_bytes(_png(np.zeros((8, 8, 3), np.uint8)))
+    (tmp_path / "standard.webp").write_bytes(b"not checked when listing")
+    (tmp_path / "notes.txt").write_text("ignored")
+    return TestClient(create_app(coins_dir=tmp_path, fonts_dir=tmp_path / "fonts", projects_dir=tmp_path / "projects")), tmp_path
+
+
+def test_coins_lists_images_standard_first(coin_client):
+    client, folder = coin_client
+    d = client.get("/api/coins").json()
+    assert d["folder"] == str(folder.resolve())
+    assert [c["file"] for c in d["coins"]] == ["standard.webp", "zebra.png"]
+    assert d["coins"][0] == {"file": "standard.webp", "name": "Standard", "url": "api/coins/standard.webp"}
+
+
+def test_coin_image_is_served_and_paths_cannot_escape(coin_client):
+    client, folder = coin_client
+    r = client.get("/api/coins/zebra.png")
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert client.get("/api/coins/missing.png").status_code == 404
+    # Anything that resolves outside the folder is refused (or never reaches the coins route at all).
+    (folder.parent / "secret.png").write_bytes(b"TOP-SECRET-BYTES")
+    for path in ("..%2Fsecret.png", "%2E%2E%2Fsecret.png", "..%5Csecret.png"):
+        assert b"TOP-SECRET-BYTES" not in client.get(f"/api/coins/{path}").content
+    assert client.get("/api/coins/notes.txt").status_code == 404
+
+
+def test_add_coin_saves_a_copy_with_a_safe_unique_name(coin_client):
+    client, folder = coin_client
+    png = _png(np.full((8, 8, 3), 200, np.uint8))
+    a = client.post("/api/coins", files={"file": ("../Brushed steel!.png", png)}).json()
+    b = client.post("/api/coins", files={"file": ("Brushed steel.png", png)}).json()
+    assert a == {"file": "Brushed steel.png", "name": "Brushed steel", "url": "api/coins/Brushed%20steel.png"}
+    assert b["file"] == "Brushed steel-2.png"
+    assert (folder / "Brushed steel.png").read_bytes() == png
+    assert client.post("/api/coins", files={"file": ("x.png", b"not an image")}).status_code == 400
+
+
+def test_fonts_library_takes_font_files_only(coin_client):
+    client, folder = coin_client
+    assert client.get("/api/fonts").json() == {"folder": str((folder / "fonts").resolve()), "fonts": []}
+    ttf = b"\x00\x01\x00\x00" + bytes(60)
+    f = client.post("/api/fonts", files={"file": ("Cinzel[wght].ttf", ttf)}).json()
+    assert f == {"file": "Cinzelwght.ttf", "name": "Cinzelwght", "url": "api/fonts/Cinzelwght.ttf"}
+    assert client.post("/api/fonts", files={"file": ("x.otf", b"OTTO" + bytes(8))}).json()["file"] == "x.otf"
+    assert client.post("/api/fonts", files={"file": ("evil.ttf", b"<html>")}).status_code == 400
+    r = client.get("/api/fonts/Cinzelwght.ttf")
+    assert r.status_code == 200 and r.headers["content-type"] == "font/ttf" and r.content == ttf
+    assert [x["file"] for x in client.get("/api/fonts").json()["fonts"]] == ["Cinzelwght.ttf", "x.otf"]
+
+
+# ---- projects ------------------------------------------------------------------------------
+
+
+def _project(name: str = "Toby", preview: bytes | None = b"PNG-PREVIEW") -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("project.json", json.dumps({"app": "relief-depth-studio", "type": "project", "format": 1, "name": name}))
+        if preview is not None:
+            z.writestr("preview.png", preview)
+    return buf.getvalue()
+
+
+def test_projects_are_saved_listed_newest_first_and_previewed(coin_client):
+    client, folder = coin_client
+    assert client.get("/api/projects").json() == {"folder": str((folder / "projects").resolve()), "projects": []}
+    a = client.post("/api/projects", files={"file": ("../Toby on swirl!.rdsproj", _project())}).json()
+    assert a["file"] == "Toby on swirl.rdsproj" and a["name"] == "Toby on swirl" and a["url"] == "api/projects/Toby%20on%20swirl.rdsproj"
+    b = client.post("/api/projects", files={"file": ("Toby on swirl.rdsproj", _project(preview=None))}).json()
+    assert b["file"] == "Toby on swirl-2.rdsproj"
+    os.utime(folder / "projects" / a["file"], (1e9, 1e9))  # a: saved long ago
+    assert [p["file"] for p in client.get("/api/projects").json()["projects"]] == [b["file"], a["file"]]
+    r = client.get("/api/projects/Toby%20on%20swirl.rdsproj")
+    assert r.status_code == 200 and r.content == _project()
+    assert client.get(a["preview"]).content == b"PNG-PREVIEW"
+    assert client.get(f"/api/projects/{quote(b['file'])}/preview").status_code == 404
+
+
+def test_saving_over_a_project_replaces_it_and_delete_removes_it(coin_client):
+    client, folder = coin_client
+    a = client.post("/api/projects", files={"file": ("Toby.rdsproj", _project("old"))}).json()
+    r = client.put(f"/api/projects/{a['file']}", files={"file": ("ignored name.rdsproj", _project("new"))})
+    assert r.status_code == 200 and r.json()["file"] == "Toby.rdsproj"
+    assert client.get("/api/projects/Toby.rdsproj").content == _project("new")
+    assert [p.name for p in (folder / "projects").iterdir()] == ["Toby.rdsproj"]  # no temp files left behind
+    assert client.put("/api/projects/missing.rdsproj", files={"file": ("x.rdsproj", _project())}).status_code == 404
+    assert client.delete("/api/projects/Toby.rdsproj").json() == {"deleted": "Toby.rdsproj"}
+    assert client.get("/api/projects").json()["projects"] == []
+    assert client.delete("/api/projects/Toby.rdsproj").status_code == 404
+
+
+def test_projects_must_be_project_files_and_stay_in_their_folder(coin_client):
+    client, folder = coin_client
+    bad = io.BytesIO()
+    with zipfile.ZipFile(bad, "w") as z:
+        z.writestr("project.json", json.dumps({"app": "something-else"}))
+    for data in (b"not a zip", bad.getvalue()):
+        assert client.post("/api/projects", files={"file": ("x.rdsproj", data)}).status_code == 400
+    client.post("/api/projects", files={"file": ("Toby.rdsproj", _project())})
+    assert client.put("/api/projects/Toby.rdsproj", files={"file": ("x", b"junk")}).status_code == 400
+    assert client.get("/api/projects/Toby.rdsproj").content == _project()  # untouched by the bad save
+    (folder / "secret.rdsproj").write_bytes(b"TOP-SECRET-BYTES")
+    for path in ("..%2Fsecret.rdsproj", "%2E%2E%2Fsecret.rdsproj", "..%5Csecret.rdsproj"):
+        assert b"TOP-SECRET-BYTES" not in client.get(f"/api/projects/{path}").content
+        assert client.delete(f"/api/projects/{path}").status_code in (404, 405)
+    assert (folder / "secret.rdsproj").exists()

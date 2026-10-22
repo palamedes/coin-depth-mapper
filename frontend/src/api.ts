@@ -57,6 +57,13 @@ export interface CircleCandidate {
   score: number;
 }
 
+/** A file in the coins (or fonts) folder. */
+export interface Coin {
+  file: string;
+  name: string;
+  url: string;
+}
+
 export interface Depth {
   w: number;
   h: number;
@@ -88,7 +95,39 @@ export async function getSystem(): Promise<SystemInfo | null> {
 }
 
 export const getModels = () => fetch("api/models").then((r) => json<ModelInfo[]>(r));
+export const getCoins = () => fetch("api/coins").then((r) => json<{ folder: string; coins: Coin[] }>(r));
+export const getFonts = () => fetch("api/fonts").then((r) => json<{ folder: string; fonts: Coin[] }>(r));
+
+/** Copy a file into the coins or fonts folder. */
+export async function addToLibrary(kind: "coins" | "fonts", file: Blob, name: string): Promise<Coin> {
+  const fd = new FormData();
+  fd.append("file", file, name);
+  return json(await fetch(`api/${kind}`, { method: "POST", body: fd }));
+}
 export const getStatus = () => fetch("api/status").then((r) => json<Status>(r));
+
+/** A saved project in the projects folder. */
+export interface Project {
+  file: string;
+  name: string;
+  url: string;
+  preview: string;
+  saved: number; // seconds since 1970
+  bytes: number;
+}
+
+export const getProjects = () => fetch("api/projects").then((r) => json<{ folder: string; projects: Project[] }>(r));
+
+/** Save a project: as a new one named after `name`, or over the existing file `replace`. */
+export async function saveProject(file: Blob, name: string, replace?: string): Promise<Project> {
+  const fd = new FormData();
+  fd.append("file", file, name);
+  return json(await fetch(replace ? `api/projects/${encodeURIComponent(replace)}` : "api/projects", { method: replace ? "PUT" : "POST", body: fd }));
+}
+
+export async function deleteProject(file: string): Promise<void> {
+  await json(await fetch(`api/projects/${encodeURIComponent(file)}`, { method: "DELETE" }));
+}
 
 export async function detectCircles(png: Blob): Promise<{ width: number; height: number; circles: CircleCandidate[] }> {
   const fd = new FormData();

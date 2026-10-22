@@ -1,6 +1,6 @@
 // Side-by-side compare view: photo on the left, depth map on the right, with one shared
-// zoom/pan. Also hosts the crop editor (left pane shows the whole photo) and the
-// cross-section line tool.
+// zoom/pan. Also hosts the crop editor (left pane shows the whole photo), the subject
+// placer (drag a cut-out around the coin) and the cross-section line tool.
 
 import type { Circle, CropShape, Rect } from "../proc/settings";
 import { h } from "./dom";
@@ -38,9 +38,18 @@ export interface CropState {
   rect: Rect;
 }
 
+/** The cut-out subject's visible box, centre and size in output pixels. */
+export interface SubjectBox {
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
+}
+
 export interface ViewerCallbacks {
   onCropChange(c: CropState, final: boolean): void;
   onProfile(a: Pt, b: Pt): void;
+  onSubjectChange(b: SubjectBox): void;
 }
 
 export class CompareViewer {
@@ -55,6 +64,7 @@ export class CompareViewer {
   private cropMode = false;
   private profileMode = false;
   private crop: CropState | null = null;
+  private subject: SubjectBox | null = null; // set while placing the subject
   private line: [Pt, Pt] | null = null;
   private fitted = false;
 
@@ -121,6 +131,26 @@ export class CompareViewer {
   updateCrop(crop: CropState) {
     this.crop = structuredClone(crop);
     this.apply();
+  }
+
+  /** Subject placer: both panes show a box around the subject to drag (move) or pull by a corner (resize). */
+  setSubjectMode(on: boolean, box?: SubjectBox) {
+    this.subject = on && box ? { ...box } : null;
+    this.apply();
+  }
+
+  updateSubjectBox(box: SubjectBox) {
+    if (this.subject) this.subject = { ...box };
+    this.apply();
+  }
+
+  private subjectCorners(b: SubjectBox): Pt[] {
+    return [
+      { x: b.cx - b.w / 2, y: b.cy - b.h / 2 },
+      { x: b.cx + b.w / 2, y: b.cy - b.h / 2 },
+      { x: b.cx + b.w / 2, y: b.cy + b.h / 2 },
+      { x: b.cx - b.w / 2, y: b.cy + b.h / 2 },
+    ];
   }
 
   setProfileMode(on: boolean) {
@@ -215,6 +245,16 @@ export class CompareViewer {
       }
       return;
     }
+    if (this.subject) {
+      const [a, , c] = this.subjectCorners(this.subject).map(S);
+      o.append(
+        svg("rect", { x: a.x, y: a.y, width: c.x - a.x, height: c.y - a.y, fill: "none", stroke: "#121417", "stroke-width": 4 }),
+        svg("rect", { x: a.x, y: a.y, width: c.x - a.x, height: c.y - a.y, fill: "none", stroke: "#ffa31a", "stroke-width": 2, "stroke-dasharray": "6 4" }),
+      );
+      for (const q of this.subjectCorners(this.subject).map(S)) {
+        o.append(svg("rect", { x: q.x - 6, y: q.y - 6, width: 12, height: 12, fill: "#ffa31a", stroke: "#121417", "stroke-width": 2 }));
+      }
+    }
     if (this.line) {
       const [a, b] = this.line.map(S);
       o.append(
@@ -228,10 +268,11 @@ export class CompareViewer {
 
   private bindPane(p: PaneParts) {
     const root = p.root;
-    let mode: "pan" | "line" | "move" | "radius" | "corner" | null = null;
+    let mode: "pan" | "line" | "move" | "radius" | "corner" | "subject" | "subjectSize" | null = null;
     let start: Pt = { x: 0, y: 0 };
     let startView: View = { scale: 1, tx: 0, ty: 0 };
     let startCrop: CropState | null = null;
+    let startSubject: SubjectBox | null = null;
     let corner = 0;
 
     const local = (e: PointerEvent | WheelEvent | MouseEvent): Pt => {
@@ -284,6 +325,13 @@ export class CompareViewer {
           } else if (ip.x > c.rect.x && ip.x < c.rect.x + c.rect.w && ip.y > c.rect.y && ip.y < c.rect.y + c.rect.h) mode = "move";
         }
         startCrop = structuredClone(c);
+      } else if (this.subject && !(p === this.left && this.cropMode)) {
+        const ip = toImg(m, v);
+        const b = this.subject;
+        const tol = 10 / v.scale;
+        if (this.subjectCorners(b).some((q) => Math.hypot(ip.x - q.x, ip.y - q.y) < tol * 1.5)) mode = "subjectSize";
+        else if (Math.abs(ip.x - b.cx) < b.w / 2 && Math.abs(ip.y - b.cy) < b.h / 2) mode = "subject";
+        startSubject = { ...b };
       } else if (this.profileMode && !(p === this.left && this.cropMode)) {
         mode = "line";
         const ip = toImg(m, v);
@@ -316,6 +364,19 @@ export class CompareViewer {
         this.cb.onProfile(this.line[0], this.line[1]);
         return;
       }
+      if ((mode === "subject" || mode === "subjectSize") && this.subject && startSubject) {
+        const sp = toImg(start, v);
+        const b = startSubject;
+        if (mode === "subject") this.subject = { ...b, cx: b.cx + ip.x - sp.x, cy: b.cy + ip.y - sp.y };
+        else {
+          // Corners scale about the centre, keeping the subject's proportions.
+          const f = Math.max(8 / Math.max(b.w, b.h), Math.hypot(ip.x - b.cx, ip.y - b.cy) / Math.max(1e-6, Math.hypot(sp.x - b.cx, sp.y - b.cy)));
+          this.subject = { ...b, w: b.w * f, h: b.h * f };
+        }
+        this.apply();
+        this.cb.onSubjectChange({ ...this.subject });
+        return;
+      }
       if (!this.crop || !startCrop) return;
       const sp = toImg(start, v);
       const dx = ip.x - sp.x;
@@ -345,7 +406,7 @@ export class CompareViewer {
     });
 
     const end = () => {
-      if (mode && mode !== "pan" && mode !== "line" && this.crop) this.cb.onCropChange(structuredClone(this.crop), true);
+      if ((mode === "move" || mode === "radius" || mode === "corner") && this.crop) this.cb.onCropChange(structuredClone(this.crop), true);
       mode = null;
       root.classList.remove("dragging");
     };

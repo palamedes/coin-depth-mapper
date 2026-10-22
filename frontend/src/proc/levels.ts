@@ -71,15 +71,28 @@ export function makeCurve(points: [number, number][]): (x: number) => number {
 
 const LUT_SIZE = 16384;
 
-/** Levels + curve as a lookup table over 0..1 (linear interpolation between entries keeps 16-bit smoothness). */
-export function toneLUT(black: number, white: number, gamma: number, curve: [number, number][]): Float32Array {
+/**
+ * Levels + curve as a lookup table over 0..1 (linear interpolation between entries keeps 16-bit
+ * smoothness). `strength` scales the result toward `anchor`, keeping its shape: 0.5 is half as far
+ * from the anchor, 0 all at it, above 1 further out (may leave 0..1).
+ */
+export function toneLUT(black: number, white: number, gamma: number, curve: [number, number][], strength = 1, anchor = 0): Float32Array {
   const c = curve.length ? makeCurve(curve) : null;
   const lut = new Float32Array(LUT_SIZE + 1);
   for (let i = 0; i <= LUT_SIZE; i++) {
     const v = levels(i / LUT_SIZE, black, white, gamma);
-    lut[i] = c ? c(v) : v;
+    lut[i] = anchor + strength * ((c ? c(v) : v) - anchor);
   }
   return lut;
+}
+
+/** One value through a lookup table from toneLUT (clamped to 0..1, interpolated). */
+export function lutAt(lut: Float32Array, v: number): number {
+  const n = lut.length - 1;
+  const f = (v < 0 ? 0 : v > 1 ? 1 : v) * n;
+  const k = Math.min(f | 0, n - 1);
+  const t = f - k;
+  return lut[k] * (1 - t) + lut[k + 1] * t;
 }
 
 export function applyLUT(img: Img, lut: Float32Array): Img {
