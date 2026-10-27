@@ -5,14 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Relief Depth Studio</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23222' stroke='%23ffa31a' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23ffa31a'/%3E%3C/svg%3E" />
-    <script type="module" crossorigin src="./assets/index-XGNKATPe.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CIcslmQ4.css">
+    <script type="module" crossorigin src="./assets/index-DqOrHSAA.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D4mEdT9O.css">
   </head>
   <body>
     <header class="topbar">
       <div class="brand"><span class="logo"></span>Relief Depth Studio</div>
-      <button id="btn-open" class="btn" data-tip="Open a PNG, JPG or WebP. You can also drag a file onto the window or paste an image with Ctrl+V.">Open image…</button>
-      <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+      <button id="btn-open" class="btn" data-tip="Open a PNG, JPG or WebP, or a saved project. You can also drag a file onto the window or paste an image with Ctrl+V.">Open image…</button>
+      <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp,.rdsproj" hidden />
+      <div class="project-buttons">
+        <button id="btn-projects" class="btn ghost" data-tip="Open a saved project, or save this one: your images, every setting, the text and the depth maps.">Projects</button>
+        <button id="btn-save" class="btn ghost" data-tip="Save the project (Ctrl+S). The first time, you give it a name; Ctrl+Shift+S saves a copy under another name.">Save project</button>
+      </div>
+      <input id="project-input" type="file" accept=".rdsproj,application/zip" hidden />
+      <input id="coin-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+      <input id="font-input" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden />
       <div class="status" id="status" aria-live="polite">
         <span id="status-text">Open an image to start.</span>
         <div class="progress" id="progress" hidden><div class="bar" id="progress-bar"></div></div>
@@ -36,6 +43,7 @@
           <button role="tab" class="tab" data-view="slices" data-tip="See which pixels LightBurn's 3D Sliced mode fires on each pass.">Slices</button>
           <div class="tools" id="tools-compare">
             <button class="btn ghost small" id="btn-edit-crop" data-tip="Show the whole photo and move or resize the coin circle / crop box.">Edit crop</button>
+            <button class="btn ghost small" id="btn-place" hidden data-tip="Move the cut-out subject on the coin (drag it) or resize it (drag a corner).">Place subject</button>
             <button class="btn ghost small" id="btn-profile" data-tip="Draw a line across the image to graph the height along it.">Cross-section</button>
             <button class="btn ghost small" id="btn-fit" data-tip="Fit the image to the window (or double-click the image).">Fit</button>
             <button class="btn ghost small" id="btn-100" data-tip="Show one image pixel per screen pixel.">1:1</button>
@@ -52,14 +60,15 @@
         <div class="empty" id="empty">
           <div class="empty-card">
             <h2>Drop an image here</h2>
-            <p>or click <b>Open image…</b>, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. PNG, JPG or WebP.</p>
+            <p>or click <b>Open image…</b>, or paste with <kbd>Ctrl</kbd>+<kbd>V</kbd>. PNG, JPG or WebP, or a saved project.</p>
             <p class="muted">A coin or medallion render works best. The circle is found automatically.</p>
           </div>
+          <div class="recent" id="recent" hidden></div>
         </div>
       </section>
     </main>
 
-    <div class="drop-overlay" id="drop-overlay" hidden><div>Drop the image to open it</div></div>
+    <div class="drop-overlay" id="drop-overlay" hidden><div>Drop the image or project to open it</div></div>
     <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
   </body>
 </html>

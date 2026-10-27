@@ -40,6 +40,19 @@ describe("levels", () => {
     expect(levels(0.49, 0.5, 0.5, 1)).toBe(0);
     expect(levels(0.5, 0.5, 0.5, 1)).toBe(1);
   });
+  it("tone LUT strength scales it toward an anchor, keeping its shape", () => {
+    const full = toneLUT(0.1, 0.9, 1.4, [[0.3, 0.2], [0.7, 0.85]]);
+    const half = toneLUT(0.1, 0.9, 1.4, [[0.3, 0.2], [0.7, 0.85]], 0.5);
+    const more = toneLUT(0.1, 0.9, 1.4, [[0.3, 0.2], [0.7, 0.85]], 1.2);
+    const fromTop = toneLUT(0.1, 0.9, 1.4, [[0.3, 0.2], [0.7, 0.85]], 0.5, 1);
+    for (let i = 0; i < full.length; i += 997) {
+      expect(half[i]).toBeCloseTo(full[i] / 2, 6);
+      expect(more[i]).toBeCloseTo(full[i] * 1.2, 6);
+      expect(fromTop[i]).toBeCloseTo(1 - (1 - full[i]) / 2, 6);
+    }
+    expect(Array.from(toneLUT(0, 1, 1, [], 0)).every((v) => v === 0)).toBe(true);
+  });
+
   it("tone LUT is monotone and hits the ends", () => {
     const lut = toneLUT(0.1, 0.9, 1.4, [[0.3, 0.2], [0.7, 0.85]]);
     for (let i = 1; i < lut.length; i++) expect(lut[i]).toBeGreaterThanOrEqual(lut[i - 1]);
